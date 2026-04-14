@@ -452,9 +452,391 @@ function getDrawerContent(id: string, role: string, vehicles: any[], recommendat
     };
   }
 
+  // ====== PERF FLOTTE KPIs ======
+  if (id === 'perf-disponibilite') {
+    return {
+      why: `Disponibilité flotte à ${fleetKPIs.availability}% (cible 95%). 3 véhicules critiques et 2 en maintenance planifiée réduisent la capacité. Durée moyenne de réparation en hausse de 12%.`,
+      trendKey: 'availability', color: '#22c55e',
+      contributors: vehicles.filter(v => !v.active || v.healthScore < 30).slice(0, 5).map(v => ({
+        label: v.id, value: v.active ? `${v.healthScore}%` : 'Inactif',
+        detail: `${v.type} — ${v.route}`, variant: 'critical' as const,
+      })),
+      alerts: ['NL-007: retrait immédiat recommandé', 'NL-045, NL-050: hors service — remplacement à évaluer'],
+    };
+  }
+  if (id === 'perf-panne') {
+    return {
+      why: `Le taux de panne reflète les véhicules avec santé <50%. Causes principales: RUL composants bas, maintenance différée, conditions Route C-3.`,
+      trendKey: 'health', color: '#ef4444',
+      contributors: vehicles.filter(v => v.healthScore < 50 && v.active).sort((a, b) => a.healthScore - b.healthScore).slice(0, 5).map(v => ({
+        label: v.id, value: `${v.healthScore}%`, detail: `${v.obd.faultCodes.length} codes défaut`, variant: 'critical' as const,
+      })),
+    };
+  }
+  if (id === 'perf-operationnels') {
+    return {
+      why: `${vehicles.filter(v => v.active && v.healthScore >= 30).length} véhicules opérationnels sur ${vehicles.length}. Capacité de couverture maintenue mais sous tension sur Route C-3.`,
+      trendKey: 'availability', color: '#22c55e',
+    };
+  }
+  if (id === 'perf-maintenance') {
+    return {
+      why: `${vehicles.filter(v => !v.active || v.healthScore < 30).length} véhicules en maintenance ou hors service. NL-007 nécessite remplacement freins + pompe. NL-045, NL-050 en fin de vie.`,
+      color: '#ef4444',
+      contributors: vehicles.filter(v => !v.active || v.healthScore < 30).map(v => ({
+        label: v.id, value: v.active ? `Santé: ${v.healthScore}%` : 'Hors service',
+        variant: 'critical' as const,
+      })),
+    };
+  }
+  if (id === 'perf-km') {
+    return {
+      why: `Kilométrage total calculé à partir du TCO et coût/km de chaque véhicule. Les routes les plus parcourues: Route A-1, Route B-2.`,
+      trendKey: 'cost', color: '#3b82f6',
+    };
+  }
+
+  // ====== ANALYSE COUTS KPIs ======
+  if (id === 'ac-total') {
+    return {
+      why: `Coût total flotte: ${(dgKPIs.totalFleetCost / 1000).toFixed(0)}K DZD ce mois, dépassant le budget de ${(dgKPIs.totalFleetBudget / 1000).toFixed(0)}K DZD. Dépassement causé par maintenance non planifiée (+340% Route C-3).`,
+      trendKey: 'cost', color: '#ef4444',
+      contributors: [
+        { label: 'Carburant', value: `${Math.round(dgKPIs.totalFleetCost * 0.4 / 1000)}K DZD`, detail: '40%', variant: 'default' as const },
+        { label: 'Maintenance', value: `${Math.round(dgKPIs.totalFleetCost * 0.35 / 1000)}K DZD`, detail: '35% — en hausse', variant: 'critical' as const },
+        { label: 'Main d\'œuvre', value: `${Math.round(dgKPIs.totalFleetCost * 0.15 / 1000)}K DZD`, detail: '15%', variant: 'default' as const },
+        { label: 'Immobilisation', value: `${Math.round(dgKPIs.totalFleetCost * 0.1 / 1000)}K DZD`, detail: '10%', variant: 'warning' as const },
+      ],
+    };
+  }
+  if (id === 'ac-carburant') {
+    return {
+      why: `Carburant représente 40% du coût flotte. Route C-3 est la plus consommatrice avec +18% vs moyenne. Conducteur D-047 identifié en surconsommation.`,
+      trendKey: 'cost', color: '#f59e0b',
+      contributors: controllingKPIs.fuelCostByRoute.sort((a, b) => b.cost - a.cost).map(r => ({
+        label: r.route, value: `${r.cost.toLocaleString()} DZD`,
+        variant: r.route === 'Route C-3' ? 'critical' as const : 'default' as const,
+      })),
+    };
+  }
+  if (id === 'ac-maintenance') {
+    return {
+      why: `Maintenance représente 35% du coût total. Hausse due à 3 interventions urgence (NL-007, NL-014, NL-022). Non planifié: ${controllingKPIs.unplannedPercent}%.`,
+      trendKey: 'cost', color: '#ef4444',
+      contributors: vehicles.sort((a, b) => b.maintenanceCostYTD - a.maintenanceCostYTD).slice(0, 5).map(v => ({
+        label: v.id, value: `${(v.maintenanceCostYTD / 1000).toFixed(0)}K DZD`, variant: v.maintenanceCostYTD > 120000 ? 'critical' as const : 'default' as const,
+      })),
+    };
+  }
+  if (id === 'ac-labour') {
+    return {
+      why: `Main d'œuvre: ${(controllingKPIs.labourCost.drivers + controllingKPIs.labourCost.mechanics + controllingKPIs.labourCost.overtime).toLocaleString()} DZD. Heures sup en hausse à ${controllingKPIs.labourCost.overtime.toLocaleString()} DZD dues aux urgences.`,
+      color: '#3b82f6',
+      contributors: [
+        { label: 'Conducteurs', value: `${controllingKPIs.labourCost.drivers.toLocaleString()} DZD`, variant: 'default' as const },
+        { label: 'Mécaniciens', value: `${controllingKPIs.labourCost.mechanics.toLocaleString()} DZD`, variant: 'default' as const },
+        { label: 'Heures sup.', value: `${controllingKPIs.labourCost.overtime.toLocaleString()} DZD`, detail: 'Urgences NL-007, NL-014', variant: 'critical' as const },
+      ],
+    };
+  }
+  if (id === 'ac-downtime') {
+    return {
+      why: `Coût d'immobilisation lié à 3 véhicules hors service et 2 en maintenance longue. Impact: perte de capacité Route C-3.`,
+      trendKey: 'downtime', color: '#8b5cf6',
+      contributors: vehicles.filter(v => !v.active || v.healthScore < 30).map(v => ({
+        label: v.id, value: `${v.downtimeCostYTD.toLocaleString()} DZD`, variant: 'critical' as const,
+      })),
+    };
+  }
+
+  // ====== ALERTES STRATEGIQUES KPIs ======
+  if (id === 'as-critical') {
+    return {
+      why: `Alertes critiques: véhicules avec santé <30% et panne prédite sous 30 jours. Action immédiate requise pour éviter pannes non planifiées coûteuses.`,
+      trendKey: 'health', color: '#ef4444',
+      contributors: vehicles.filter(v => v.healthScore < 30 && v.active).map(v => ({
+        label: v.id, value: `${v.healthScore}%`, detail: `Panne prédite sous ${Math.min(...v.components.map(c => c.daysRemaining))}j`, variant: 'critical' as const,
+      })),
+    };
+  }
+  if (id === 'as-pending') {
+    return {
+      why: `Alertes en attente de décision managériale. Chaque jour de retard augmente le risque de panne non planifiée et le coût associé.`,
+      color: '#f59e0b',
+      contributors: [
+        { label: 'Alertes critiques', value: `${vehicles.filter(v => v.healthScore < 30 && v.active).length}`, variant: 'critical' as const },
+        { label: 'Alertes haute priorité', value: `${vehicles.filter(v => v.riskScore > 70 && v.healthScore >= 30).length}`, variant: 'warning' as const },
+      ],
+    };
+  }
+  if (id === 'as-risk') {
+    return {
+      why: `Le coût total à risque représente l'impact financier cumulé si aucune action n'est prise sur les alertes actives. Inclut coûts de panne, immobilisation et cascade.`,
+      trendKey: 'cost', color: '#ef4444',
+      contributors: recommendations.map(r => ({
+        label: r.vehicleIds.join(', '), value: `${r.failureCost.toLocaleString()} DZD`,
+        detail: `Réparation: ${r.repairCost.toLocaleString()} DZD`, variant: 'critical' as const,
+      })),
+    };
+  }
+  if (id === 'as-recs') {
+    return {
+      why: `${recommendations.filter(r => r.status === 'pending').length} recommandations IA en attente d'approbation. Valeur protégeable: ${recommendations.filter(r => r.status === 'pending').reduce((s, r) => s + (r.failureCost - r.repairCost), 0).toLocaleString()} DZD.`,
+      color: '#8b5cf6',
+      contributors: recommendations.filter(r => r.status === 'pending').map(r => ({
+        label: r.vehicleIds.join(', '), value: `Confiance: ${r.confidence}%`,
+        detail: r.action.substring(0, 60), variant: 'warning' as const,
+      })),
+    };
+  }
+
+  // ====== VARIANCE COUTS KPIs ======
+  if (id === 'vc-global') {
+    return {
+      why: `Variance globale causée par: 2.1% → immobilisation prolongée (NL-014, NL-022), 1.4% → inflation pièces détachées, 0.7% → heures supplémentaires.`,
+      trendKey: 'cost', color: '#ef4444',
+      contributors: [
+        { label: 'Immobilisation prolongée', value: '+2.1%', detail: 'NL-014 (+3j), NL-022 (+2j)', variant: 'critical' as const },
+        { label: 'Inflation pièces', value: '+1.4%', detail: 'Hausse fournisseur Q2', variant: 'warning' as const },
+        { label: 'Heures supplémentaires', value: '+0.7%', detail: 'Urgences NL-007', variant: 'warning' as const },
+      ],
+      alerts: ['NL-014: immobilisé 5j vs 2j planifiés — pièce turbo en rupture'],
+    };
+  }
+  if (id === 'vc-worst') {
+    return {
+      why: `La maintenance est la catégorie la plus déviante à cause des interventions non planifiées (+340% sur Route C-3) et des urgences sur NL-007 et NL-014.`,
+      trendKey: 'cost', color: '#ef4444',
+      contributors: [
+        { label: 'Non planifié Route C-3', value: '+340%', variant: 'critical' as const },
+        { label: 'Urgence NL-007', value: '42 000 DZD', variant: 'critical' as const },
+        { label: 'Urgence NL-014', value: '28 000 DZD', variant: 'warning' as const },
+      ],
+    };
+  }
+  if (id === 'vc-amount') {
+    return {
+      why: `Montant hors budget décomposé: maintenance non planifiée (77K DZD), heures sup mécaniciens (25K DZD), pièces en hausse de prix (48K DZD).`,
+      trendKey: 'cost', color: '#ef4444',
+    };
+  }
+  if (id === 'vc-routes') {
+    return {
+      why: `Routes en dépassement: Route C-3 (+18.3%), Route A-1 (+5%), Route B-2 (+2%). Route C-3 concentre 65% du dépassement total.`,
+      color: '#f59e0b',
+      contributors: [
+        { label: 'Route C-3', value: '+18.3%', detail: 'Maintenance +340%', variant: 'critical' as const },
+        { label: 'Route A-1', value: '+5.0%', detail: 'Carburant en hausse', variant: 'warning' as const },
+        { label: 'Route B-2', value: '+2.0%', detail: 'Légèrement au-dessus', variant: 'warning' as const },
+      ],
+    };
+  }
+
+  // ====== TCO VEHICULE KPIs ======
+  if (id === 'tco-avg') {
+    const avg = Math.round(vehicles.reduce((s, v) => s + v.tco, 0) / vehicles.length);
+    return {
+      why: `TCO moyen: ${(avg / 1000).toFixed(0)}K DZD. Composé de: acquisition (~30%), carburant (~25%), maintenance (~25%), main d'œuvre (~10%), immobilisation (~10%).`,
+      trendKey: 'cost', color: '#f59e0b',
+      contributors: vehicles.sort((a, b) => b.tco - a.tco).slice(0, 5).map(v => ({
+        label: v.id, value: `${(v.tco / 1000).toFixed(0)}K DZD`, variant: v.tco > avg * 1.2 ? 'critical' as const : 'default' as const,
+      })),
+    };
+  }
+  if (id === 'tco-max') {
+    const max = vehicles.reduce((m, v) => v.tco > m.tco ? v : m);
+    return {
+      why: `${max.id} est le véhicule le plus coûteux avec un TCO de ${(max.tco / 1000).toFixed(0)}K DZD. Maintenance YTD: ${(max.maintenanceCostYTD / 1000).toFixed(0)}K, Downtime: ${(max.downtimeCostYTD / 1000).toFixed(0)}K.`,
+      color: '#ef4444',
+      contributors: [
+        { label: 'Maintenance', value: `${max.maintenanceCostYTD.toLocaleString()} DZD`, variant: 'critical' as const },
+        { label: 'Downtime', value: `${max.downtimeCostYTD.toLocaleString()} DZD`, variant: 'warning' as const },
+        { label: 'Coût/km', value: `${max.costPerKm} DZD`, variant: 'default' as const },
+      ],
+    };
+  }
+  if (id === 'tco-over') {
+    const avg = Math.round(vehicles.reduce((s, v) => s + v.tco, 0) / vehicles.length);
+    return {
+      why: `${vehicles.filter(v => v.tco > avg * 1.2).length} véhicules dépassent le TCO cible (>20% au-dessus de la moyenne de ${(avg / 1000).toFixed(0)}K DZD). Remplacement ou optimisation recommandé.`,
+      color: '#ef4444',
+      contributors: vehicles.filter(v => v.tco > avg * 1.2).sort((a, b) => b.tco - a.tco).slice(0, 5).map(v => ({
+        label: v.id, value: `${(v.tco / 1000).toFixed(0)}K DZD`, detail: `+${Math.round((v.tco / avg - 1) * 100)}% vs moyenne`, variant: 'critical' as const,
+      })),
+    };
+  }
+  if (id === 'tco-savings') {
+    return {
+      why: `Économies potentielles identifiées en remplaçant ou optimisant les véhicules dépassant le TCO cible. Inclut réduction maintenance, optimisation routes, remplacement fin de vie.`,
+      color: '#22c55e',
+    };
+  }
+
+  // ====== CARBURANT & MAIN D'OEUVRE KPIs ======
+  if (id === 'cm-fuel') {
+    return {
+      why: `Coût carburant total basé sur la consommation par route et conducteur. Route C-3 présente la consommation la plus élevée à 18.9 L/100km (conducteur D-007).`,
+      trendKey: 'cost', color: '#f59e0b',
+      contributors: controllingKPIs.fuelCostByRoute.sort((a, b) => b.cost - a.cost).map(r => ({
+        label: r.route, value: `${r.cost.toLocaleString()} DZD`, variant: r.route === 'Route C-3' ? 'critical' as const : 'default' as const,
+      })),
+    };
+  }
+  if (id === 'cm-costkmfuel') {
+    return {
+      why: `Coût/km carburant influencé par les conditions de route, style de conduite et état des véhicules. Optimisation possible via coaching conducteurs.`,
+      color: '#f59e0b',
+    };
+  }
+  if (id === 'cm-labour') {
+    return {
+      why: `Main d'œuvre totale: conducteurs ${controllingKPIs.labourCost.drivers.toLocaleString()} DZD + mécaniciens ${controllingKPIs.labourCost.mechanics.toLocaleString()} DZD + heures sup ${controllingKPIs.labourCost.overtime.toLocaleString()} DZD.`,
+      color: '#3b82f6',
+      contributors: [
+        { label: 'Conducteurs', value: `${controllingKPIs.labourCost.drivers.toLocaleString()} DZD`, variant: 'default' as const },
+        { label: 'Mécaniciens', value: `${controllingKPIs.labourCost.mechanics.toLocaleString()} DZD`, variant: 'default' as const },
+        { label: 'Heures sup.', value: `${controllingKPIs.labourCost.overtime.toLocaleString()} DZD`, variant: 'critical' as const },
+      ],
+    };
+  }
+  if (id === 'cm-overtime') {
+    return {
+      why: `Heures supplémentaires en hausse dues aux urgences sur NL-007 (freins + pompe) et NL-014 (turbo). Mechanic A a accumulé 32h de sup ce mois.`,
+      color: '#ef4444',
+      contributors: [
+        { label: 'Mechanic A', value: '32h sup', detail: 'Urgences NL-007, NL-014', variant: 'critical' as const },
+        { label: 'D-007', value: '24h sup', detail: 'Remplacement conducteur NL-007', variant: 'warning' as const },
+        { label: 'D-014', value: '18h sup', detail: 'Route C-3 surcharge', variant: 'warning' as const },
+      ],
+    };
+  }
+  if (id === 'cm-worstdriver') {
+    return {
+      why: `D-007 consomme 18.9 L/100km sur Route C-3, soit +30% au-dessus de la moyenne flotte de 14.5 L/100km. Coaching recommandé.`,
+      color: '#ef4444',
+      contributors: [
+        { label: 'D-007 (Route C-3)', value: '18.9 L/100km', detail: '+30% vs moyenne', variant: 'critical' as const },
+        { label: 'D-014 (Route C-3)', value: '17.7 L/100km', detail: '+22% vs moyenne', variant: 'critical' as const },
+        { label: 'D-008 (Route B-2)', value: '15.1 L/100km', detail: '+4% vs moyenne', variant: 'warning' as const },
+      ],
+    };
+  }
+
+  // ====== ROI MAINTENANCE KPIs ======
+  if (id === 'roi-global') {
+    const approved2 = recommendations.filter(r => r.status === 'approved');
+    const roi2 = approved2.length > 0 ? Math.round((approved2.reduce((s, r) => s + (r.failureCost - r.repairCost), 0) / approved2.reduce((s, r) => s + r.repairCost, 0)) * 100) : 0;
+    return {
+      why: `ROI global de ${roi2}%: chaque DZD investi en maintenance préventive basée sur IA évite en moyenne ${(roi2 / 100).toFixed(1)} DZD en coûts de panne.`,
+      color: '#22c55e',
+      contributors: recommendations.map(r => ({
+        label: r.vehicleIds.join(', '), value: `${Math.round(((r.failureCost - r.repairCost) / r.repairCost) * 100)}%`,
+        detail: r.action.substring(0, 50), variant: r.status === 'approved' ? 'default' as const : 'warning' as const,
+      })),
+    };
+  }
+  if (id === 'roi-saved') {
+    return {
+      why: `Montant économisé grâce aux recommandations approuvées. Représente la différence entre coût de panne évitée et coût de réparation préventive.`,
+      color: '#22c55e',
+    };
+  }
+  if (id === 'roi-approved') {
+    return {
+      why: `${recommendations.filter(r => r.status === 'approved').length} recommandations ont été approuvées et exécutées. Suivi post-action en cours pour valider l'impact.`,
+      color: '#22c55e',
+      contributors: recommendations.filter(r => r.status === 'approved').map(r => ({
+        label: r.vehicleIds.join(', '), value: `${(r.failureCost - r.repairCost).toLocaleString()} DZD économisés`,
+        variant: 'default' as const,
+      })),
+    };
+  }
+  if (id === 'roi-deferred') {
+    return {
+      why: `${recommendations.filter(r => r.status === 'deferred').length} recommandations différées. Risque: le coût de panne augmente avec le temps. Réévaluation recommandée sous 7 jours.`,
+      color: '#f59e0b',
+      contributors: recommendations.filter(r => r.status === 'deferred').map(r => ({
+        label: r.vehicleIds.join(', '), value: `${r.failureCost.toLocaleString()} DZD à risque`,
+        detail: r.action.substring(0, 50), variant: 'warning' as const,
+      })),
+    };
+  }
+  if (id === 'roi-avoided') {
+    return {
+      why: `Coût total évitable si toutes les recommandations sont acceptées. Calcul: somme des (coût panne - coût réparation) pour chaque recommandation.`,
+      color: '#8b5cf6',
+      contributors: recommendations.map(r => ({
+        label: r.vehicleIds.join(', '), value: `${(r.failureCost - r.repairCost).toLocaleString()} DZD`,
+        detail: `Confiance: ${r.confidence}%`, variant: r.status === 'pending' ? 'warning' as const : 'default' as const,
+      })),
+    };
+  }
+
+  // Generic drawer for detail clicks (variance detail, vehicle TCO, fuel row, labour row, alert detail, rec detail)
+  if (id.startsWith('vc-detail-')) {
+    const cat = id.replace('vc-detail-', '');
+    return {
+      why: cat === 'Maintenance' 
+        ? `Variance maintenance: 2.1% → immobilisation prolongée (NL-014, NL-022) / 1.4% → inflation pièces détachées / 0.7% → heures supplémentaires mécaniciens.`
+        : cat === 'Carburant'
+        ? `Variance carburant: hausse prix +3%, surconsommation Route C-3 (+18%), conducteur D-047 freinage brusque.`
+        : `Variance ${cat}: décomposition détaillée disponible. Principaux facteurs identifiés par l'analyse IA.`,
+      trendKey: 'cost', color: '#ef4444',
+    };
+  }
+  if (id.startsWith('tco-vehicle-')) {
+    const vid = id.replace('tco-vehicle-', '');
+    const veh = vehicles.find(v => v.id === vid);
+    if (veh) {
+      return {
+        why: `TCO ${veh.id}: ${veh.tco.toLocaleString()} DZD. Maintenance: ${veh.maintenanceCostYTD.toLocaleString()} DZD, Downtime: ${veh.downtimeCostYTD.toLocaleString()} DZD, Coût/km: ${veh.costPerKm} DZD. ${veh.type}, acquis en ${veh.acquisitionDate}.`,
+        trendKey: 'cost', color: '#f59e0b',
+        contributors: [
+          { label: 'Carburant (est.)', value: `${Math.round(veh.tco * 0.4).toLocaleString()} DZD`, variant: 'default' as const },
+          { label: 'Maintenance', value: `${veh.maintenanceCostYTD.toLocaleString()} DZD`, variant: veh.maintenanceCostYTD > 120000 ? 'critical' as const : 'default' as const },
+          { label: 'Downtime', value: `${veh.downtimeCostYTD.toLocaleString()} DZD`, variant: veh.downtimeCostYTD > 40000 ? 'warning' as const : 'default' as const },
+        ],
+      };
+    }
+  }
+  if (id.startsWith('cm-fuelrow-')) {
+    const driver = id.replace('cm-fuelrow-', '');
+    return {
+      why: `Consommation détaillée de ${driver}. Analyse des tendances de consommation, comparaison avec la moyenne flotte, et identification d'anomalies.`,
+      trendKey: 'cost', color: '#f59e0b',
+    };
+  }
+  if (id.startsWith('cm-labourrow-')) {
+    const name = id.replace('cm-labourrow-', '');
+    return {
+      why: `Détail main d'œuvre pour ${name}. Heures normales, heures supplémentaires, et identification d'anomalies de coût.`,
+      color: '#3b82f6',
+    };
+  }
+  if (id.startsWith('alert-detail-')) {
+    return {
+      why: `Chaîne d'événements: détection anomalie OBD → validation par analyse RUL → corrélation comportement conducteur → évaluation financière. Action recommandée par le module IA avec évaluation coût/bénéfice.`,
+      trendKey: 'health', color: '#ef4444',
+      alerts: ['Source: module prédictif IA — confiance >80%', 'Impact cascade potentiel sur routes associées'],
+    };
+  }
+  if (id.startsWith('roi-rec-')) {
+    const recId = id.replace('roi-rec-', '');
+    const rec = recommendations.find(r => r.id === recId);
+    if (rec) {
+      return {
+        why: `Recommandation ${rec.id}: ${rec.action}. Signaux déclencheurs: ${rec.signals.join(', ')}. ROI: ${Math.round(((rec.failureCost - rec.repairCost) / rec.repairCost) * 100)}%.`,
+        color: '#8b5cf6',
+        contributors: rec.signals.map(s => ({
+          label: s, value: 'Signal actif', variant: 'warning' as const,
+        })),
+      };
+    }
+  }
+
   // Default fallback
   return {
-    why: 'Données détaillées pour ce KPI.',
+    why: 'Données détaillées pour ce KPI. Analyse approfondie disponible.',
     trendKey: 'cost',
     color: '#f59e0b',
   };
