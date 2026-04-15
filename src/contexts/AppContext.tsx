@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useMemo } from 'react';
 import { Role, Vehicle, AIRecommendation, generateVehicles, generateRecommendations } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type Module = 
   | 'dashboard' | 'techmaintain' | 'fleettrack' | 'costguard' | 'ai-commander'
@@ -15,7 +16,6 @@ interface KPIDrawerData {
 
 interface AppContextType {
   role: Role;
-  setRole: (r: Role) => void;
   module: Module;
   setModule: (m: Module) => void;
   vehicles: Vehicle[];
@@ -34,7 +34,8 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRole] = useState<Role>('fleet-manager');
+  const { role: authRole } = useAuth();
+  const role = authRole!; // guaranteed by ProtectedRoute
   const [module, setModule] = useState<Module>('dashboard');
   const [vehicles] = useState(() => generateVehicles());
   const [recommendations, setRecommendations] = useState(() => generateRecommendations());
@@ -47,15 +48,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setRecommendations(prev => prev.map(r => r.id === id ? { ...r, status } : r));
   };
 
-  const handleSetRole = (r: Role) => {
-    setRole(r);
-    setModule('dashboard');
-    setKpiDrawer(null);
-    setSelectedVehicle(null);
-  };
-
   const value = useMemo(() => ({
-    role, setRole: handleSetRole, module, setModule, vehicles, recommendations,
+    role, module, setModule, vehicles, recommendations,
     updateRecommendation, searchQuery, setSearchQuery, activeFilter,
     setActiveFilter, selectedVehicle, setSelectedVehicle, kpiDrawer, setKpiDrawer,
   // eslint-disable-next-line react-hooks/exhaustive-deps
