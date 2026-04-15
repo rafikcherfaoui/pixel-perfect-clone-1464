@@ -1,11 +1,13 @@
-import { Truck, BarChart3, MapPin, DollarSign, Bot, ChevronDown, Wrench, AlertTriangle, TrendingUp, Activity, PieChart, Fuel, Shield } from 'lucide-react';
+import { Truck, BarChart3, MapPin, DollarSign, Bot, Wrench, AlertTriangle, TrendingUp, Activity, PieChart, Fuel, Shield, LogOut } from 'lucide-react';
 import { useApp, Module } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import type { Role } from '@/data/mockData';
 import { LucideIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const roleLabels: Record<Role, string> = {
-  'fleet-manager': 'Fleet Manager',
+  'fleet-manager': 'Gestionnaire de Flotte',
   'dg': 'Direction Générale',
   'controlling': 'Contrôleur de Gestion',
 };
@@ -41,8 +43,15 @@ const modulesByRole: Record<Role, ModuleItem[]> = {
 };
 
 export default function AppSidebar() {
-  const { role, setRole, module, setModule } = useApp();
+  const { role, module, setModule } = useApp();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const modules = modulesByRole[role];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
@@ -54,24 +63,6 @@ export default function AppSidebar() {
           <span className="text-lg font-bold text-foreground tracking-tight">
             Next<span className="text-primary">Transit</span>
           </span>
-        </div>
-      </div>
-
-      <div className="p-4 border-b border-sidebar-border">
-        <label className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2 block font-medium">
-          Rôle actif
-        </label>
-        <div className="relative">
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full appearance-none bg-secondary text-foreground text-sm px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer pr-8"
-          >
-            {Object.entries(roleLabels).map(([val, label]) => (
-              <option key={val} value={val} className="bg-card">{label}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
       </div>
 
@@ -96,7 +87,7 @@ export default function AppSidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border space-y-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
             NT
@@ -106,6 +97,13 @@ export default function AppSidebar() {
             <p className="text-muted-foreground">{roleLabels[role]}</p>
           </div>
         </div>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Se déconnecter
+        </button>
       </div>
     </aside>
   );
