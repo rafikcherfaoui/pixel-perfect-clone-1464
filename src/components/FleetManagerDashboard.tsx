@@ -4,7 +4,8 @@ import { fleetKPIs } from '@/data/mockData';
 import KPICard from '@/components/KPICard';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleDrawer from '@/components/VehicleDrawer';
-import RulHoverCard from '@/components/RulHoverCard';
+import RulListItem from '@/components/RulListItem';
+import RulTitleInfo from '@/components/RulTitleInfo';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
 
@@ -78,11 +79,12 @@ export default function FleetManagerDashboard() {
       <div className="w-72 shrink-0 overflow-y-auto">
         <div className="bg-card border border-border rounded-xl p-4">
           <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-critical" /> Top 10 RUL Critiques
+            <AlertTriangle className="w-4 h-4 text-critical" />
+            <RulTitleInfo />
           </h3>
           <div className="space-y-3">
             {criticalComponents.map((c, i) => (
-              <RulHoverCard
+              <RulListItem
                 key={`${c.vehicleId}-${c.component}-${i}`}
                 vehicleId={c.vehicleId}
                 component={c.component}
