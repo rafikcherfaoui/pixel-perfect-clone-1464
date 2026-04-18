@@ -697,12 +697,38 @@ function getDrawerContent(id: string, role: string, vehicles: any[], recommendat
 
   // ====== CARBURANT & MAIN D'OEUVRE KPIs ======
   if (id === 'cm-fuel') {
+    const totalCost = controllingKPIs.fuelCostByRoute.reduce((s, r) => s + r.cost, 0);
+    const totalLitres = 6040;
+    const avgPricePerLitre = Math.round(totalCost / totalLitres);
+    const totalKm = 41100;
+    const costPerKm = (totalCost / totalKm).toFixed(1);
     return {
-      why: `Coût carburant total basé sur la consommation par route et conducteur. Route C-3 présente la consommation la plus élevée à 18.9 L/100km (conducteur D-007).`,
-      trendKey: 'cost', color: '#f59e0b',
-      contributors: controllingKPIs.fuelCostByRoute.sort((a, b) => b.cost - a.cost).map(r => ({
-        label: r.route, value: `${r.cost.toLocaleString()} DZD`, variant: r.route === 'Route C-3' ? 'critical' as const : 'default' as const,
-      })),
+      why: `Le coût carburant total est la somme de toutes les consommations de la flotte sur la période sélectionnée. Les principaux facteurs sont : kilométrage parcouru, comportement conducteur (freinage brusque, ralenti excessif), état des pneumatiques et charge transportée.`,
+      trendKey: 'cost',
+      color: '#f59e0b',
+      contributors: [
+        { label: 'Coût total carburant', value: `${totalCost.toLocaleString()} DZD`, detail: 'Ce mois — 50 véhicules', variant: 'default' as const },
+        { label: 'Litres consommés', value: `${totalLitres.toLocaleString()} L`, detail: 'Diesel — toute flotte', variant: 'default' as const },
+        { label: 'Coût moyen / litre', value: `${avgPricePerLitre} DZD`, detail: 'Prix pondéré flotte', variant: 'default' as const },
+        { label: 'Coût carburant / km', value: `${costPerKm} DZD/km`, detail: `${totalKm.toLocaleString()} km parcourus`, variant: 'default' as const },
+        { label: 'Véhicule + consommateur', value: 'NL-007', detail: '72 000 DZD — Route C-3', variant: 'critical' as const },
+        { label: 'Conducteur + consommateur', value: 'D-007', detail: '72 000 DZD — 18.9 L/100km', variant: 'critical' as const },
+      ],
+      table: {
+        title: 'Top 5 Véhicules par Consommation',
+        headers: ['Véhicule', 'Route', 'Km', 'Litres', 'Coût DZD', 'L/100km', 'vs Moy'],
+        rows: [
+          ['NL-007', 'Route C-3', '3 800', '720', '72 000', '18.9', '🔴 +30%'],
+          ['NL-014', 'Route C-3', '3 900', '690', '69 000', '17.7', '🔴 +22%'],
+          ['NL-022', 'Route B-2', '4 500', '680', '68 000', '15.1', '🟡 +4%'],
+          ['NL-019', 'Route B-2', '4 300', '610', '61 000', '14.2', '🟢 -2%'],
+          ['NL-031', 'Route E-5', '4 100', '590', '59 000', '14.4', '🟢 -1%'],
+        ],
+      },
+      alerts: [
+        '🎯 Top 5 conducteurs : D-007 (Route C-3, freinage brutal 🔴), D-014 (Route C-3, freinage brutal 🔴), D-008 (Route B-2), D-019 (Route B-2), D-031 (Route E-5).',
+        '💡 Les conducteurs avec un score de freinage brutal consomment en moyenne 18% de carburant supplémentaire. Recommandation : programme de formation conduite économique.',
+      ],
     };
   }
   if (id === 'cm-costkmfuel') {
