@@ -57,9 +57,7 @@ export default function AppSidebar() {
     <aside className="w-64 min-h-screen bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
       <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Truck className="w-5 h-5 text-primary" />
-          </div>
+          <Truck className="w-6 h-6" style={{ color: '#3fb950' }} />
           <span className="text-lg font-bold text-foreground tracking-tight">
             Next<span className="text-primary">Transit</span>
           </span>
