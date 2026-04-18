@@ -1,7 +1,7 @@
-import { Search, Calendar, Truck } from 'lucide-react';
+import { Search, Truck } from 'lucide-react';
 import { useApp, Module } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import DateRangePicker from '@/components/DateRangePicker';
 import type { Role } from '@/data/mockData';
 
 const filters = ['Tous', 'Keystone', 'Earner', 'Specialist', 'Risque >70%', 'Alertes'];
@@ -30,19 +30,12 @@ const navTabs: Record<Role, { id: Module; label: string }[]> = {
   ],
 };
 
-const months = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
 
 export default function TopBar() {
   const { role, module, setModule, searchQuery, setSearchQuery, activeFilter, setActiveFilter, vehicles } = useApp();
   const varianceCount = vehicles.filter(v => v.healthScore < 50 && v.active).length;
   const header = roleHeaders[role];
-  const today = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
 
-  const dateFr = today.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
   const tabs = navTabs[role];
 
   return (
