@@ -280,25 +280,8 @@ export default function VehicleDrawer() {
           </section>
 
           {/* OBD */}
-          <section className="bg-secondary/50 rounded-xl p-4 space-y-2">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> Données OBD
-              {obdStale && <span className="text-[10px] bg-critical/20 text-critical px-2 py-0.5 rounded-full ml-auto">⚠ &gt;24h</span>}
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div><span className="text-muted-foreground">Temp. moteur:</span> <span className="text-foreground ml-1">{v.obd.engineTemp}°C</span></div>
-              <div><span className="text-muted-foreground">RPM:</span> <span className="text-foreground ml-1">{v.obd.rpm}</span></div>
-              <div><span className="text-muted-foreground">Charge:</span> <span className="text-foreground ml-1">{v.obd.engineLoad}%</span></div>
-              <div><span className="text-muted-foreground">Check:</span> <span className="text-foreground ml-1">{new Date(v.obd.lastCheck).toLocaleString('fr-FR')}</span></div>
-            </div>
-            {v.obd.faultCodes.length > 0 && (
-              <div className="flex gap-1.5 mt-1 flex-wrap">
-                {v.obd.faultCodes.map(code => (
-                  <span key={code} className="text-[10px] bg-critical/20 text-critical px-2 py-0.5 rounded font-mono">{code}</span>
-                ))}
-              </div>
-            )}
-          </section>
+          <ObdSection v={v} obdStale={obdStale} />
+
 
           {/* Maintenance history */}
           <section className="space-y-2">
