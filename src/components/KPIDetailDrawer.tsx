@@ -427,16 +427,39 @@ function getDrawerContent(id: string, role: string, vehicles: any[], recommendat
   }
 
   if (id === 'ctrl-fuel') {
+    const sortedRoutes = [...controllingKPIs.fuelCostByRoute].sort((a, b) => b.cost - a.cost);
+    const totalCost = sortedRoutes.reduce((s, r) => s + r.cost, 0);
+    const routeMeta: Record<string, { km: number; vehicles: number; litres: number; budget: number }> = {
+      'Route A-1': { km: 8400, vehicles: 6, litres: 1120, budget: 175000 },
+      'Route B-2': { km: 8800, vehicles: 7, litres: 1290, budget: 200000 },
+      'Route C-3': { km: 7700, vehicles: 5, litres: 1410, budget: 245000 },
+      'Route D-4': { km: 8200, vehicles: 5, litres: 1040, budget: 170000 },
+      'Route E-5': { km: 8000, vehicles: 6, litres: 1180, budget: 195000 },
+    };
     return {
-      why: 'Analyse coût carburant par route et conducteur. Route C-3 présente la consommation la plus élevée (+18% vs moyenne).',
+      why: `Les variations de coût carburant par route s'expliquent par : le profil de la route (urbain vs autoroute vs montagne), le comportement du conducteur assigné, la charge moyenne transportée, et l'état des véhicules utilisés sur cette route.`,
+      trendKey: 'cost',
       color: '#f59e0b',
-      contributors: controllingKPIs.fuelCostByRoute.sort((a, b) => b.cost - a.cost).map(r => ({
-        label: r.route,
-        value: `${r.cost.toLocaleString()} DZD`,
-        detail: r.route === 'Route C-3' ? '⚠ +18% vs moyenne — anomalie conducteur' : undefined,
-        variant: r.route === 'Route C-3' ? 'critical' as const : 'default' as const,
-      })),
-      alerts: ['Route C-3: Conducteur D-047 — consommation anormale (+18%)'],
+      contributors: [
+        { label: 'Coût total carburant', value: `${totalCost.toLocaleString()} DZD`, detail: 'Ce mois — toutes routes', variant: 'default' as const },
+        { label: 'Route la plus coûteuse', value: 'Route C-3', detail: '+18% vs budget — Conducteur D-047 freinage brutal', variant: 'critical' as const },
+        { label: 'Économie estimée', value: '45 000 DZD/mois', detail: 'Réaffectation D-047 + formation', variant: 'default' as const },
+      ],
+      table: {
+        title: 'Répartition par Route — Coût/km vs Budget',
+        headers: ['Route', 'Km', 'Véh.', 'Litres', 'Coût DZD', 'Coût/km', 'vs Budget', 'Statut'],
+        rows: sortedRoutes.map(r => {
+          const m = routeMeta[r.route] ?? { km: 8000, vehicles: 5, litres: 1100, budget: r.cost };
+          const costKm = (r.cost / m.km).toFixed(1);
+          const variance = ((r.cost - m.budget) / m.budget * 100);
+          const statut = variance > 10 ? '🔴 Dépassement' : variance > 0 ? '🟡 Surveillance' : '🟢 Normal';
+          return [r.route, m.km.toLocaleString(), String(m.vehicles), m.litres.toString(), r.cost.toLocaleString(), `${costKm} DZD`, `${variance > 0 ? '+' : ''}${variance.toFixed(1)}%`, statut];
+        }),
+      },
+      alerts: [
+        '🎯 Route C-3 : +18% au-dessus du budget carburant. Cause principale : Conducteur D-047 (freinage brutal, +23% consommation) + profil route vallonné + 2 véhicules avec pression pneus insuffisante.',
+        '💡 Recommandation : Réaffecter D-047 à une route plate jusqu\'à formation complétée. Économie estimée : 45 000 DZD/mois sur Route C-3.',
+      ],
     };
   }
 
@@ -674,12 +697,38 @@ function getDrawerContent(id: string, role: string, vehicles: any[], recommendat
 
   // ====== CARBURANT & MAIN D'OEUVRE KPIs ======
   if (id === 'cm-fuel') {
+    const totalCost = controllingKPIs.fuelCostByRoute.reduce((s, r) => s + r.cost, 0);
+    const totalLitres = 6040;
+    const avgPricePerLitre = Math.round(totalCost / totalLitres);
+    const totalKm = 41100;
+    const costPerKm = (totalCost / totalKm).toFixed(1);
     return {
-      why: `Coût carburant total basé sur la consommation par route et conducteur. Route C-3 présente la consommation la plus élevée à 18.9 L/100km (conducteur D-007).`,
-      trendKey: 'cost', color: '#f59e0b',
-      contributors: controllingKPIs.fuelCostByRoute.sort((a, b) => b.cost - a.cost).map(r => ({
-        label: r.route, value: `${r.cost.toLocaleString()} DZD`, variant: r.route === 'Route C-3' ? 'critical' as const : 'default' as const,
-      })),
+      why: `Le coût carburant total est la somme de toutes les consommations de la flotte sur la période sélectionnée. Les principaux facteurs sont : kilométrage parcouru, comportement conducteur (freinage brusque, ralenti excessif), état des pneumatiques et charge transportée.`,
+      trendKey: 'cost',
+      color: '#f59e0b',
+      contributors: [
+        { label: 'Coût total carburant', value: `${totalCost.toLocaleString()} DZD`, detail: 'Ce mois — 50 véhicules', variant: 'default' as const },
+        { label: 'Litres consommés', value: `${totalLitres.toLocaleString()} L`, detail: 'Diesel — toute flotte', variant: 'default' as const },
+        { label: 'Coût moyen / litre', value: `${avgPricePerLitre} DZD`, detail: 'Prix pondéré flotte', variant: 'default' as const },
+        { label: 'Coût carburant / km', value: `${costPerKm} DZD/km`, detail: `${totalKm.toLocaleString()} km parcourus`, variant: 'default' as const },
+        { label: 'Véhicule + consommateur', value: 'NL-007', detail: '72 000 DZD — Route C-3', variant: 'critical' as const },
+        { label: 'Conducteur + consommateur', value: 'D-007', detail: '72 000 DZD — 18.9 L/100km', variant: 'critical' as const },
+      ],
+      table: {
+        title: 'Top 5 Véhicules par Consommation',
+        headers: ['Véhicule', 'Route', 'Km', 'Litres', 'Coût DZD', 'L/100km', 'vs Moy'],
+        rows: [
+          ['NL-007', 'Route C-3', '3 800', '720', '72 000', '18.9', '🔴 +30%'],
+          ['NL-014', 'Route C-3', '3 900', '690', '69 000', '17.7', '🔴 +22%'],
+          ['NL-022', 'Route B-2', '4 500', '680', '68 000', '15.1', '🟡 +4%'],
+          ['NL-019', 'Route B-2', '4 300', '610', '61 000', '14.2', '🟢 -2%'],
+          ['NL-031', 'Route E-5', '4 100', '590', '59 000', '14.4', '🟢 -1%'],
+        ],
+      },
+      alerts: [
+        '🎯 Top 5 conducteurs : D-007 (Route C-3, freinage brutal 🔴), D-014 (Route C-3, freinage brutal 🔴), D-008 (Route B-2), D-019 (Route B-2), D-031 (Route E-5).',
+        '💡 Les conducteurs avec un score de freinage brutal consomment en moyenne 18% de carburant supplémentaire. Recommandation : programme de formation conduite économique.',
+      ],
     };
   }
   if (id === 'cm-costkmfuel') {

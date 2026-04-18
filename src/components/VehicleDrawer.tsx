@@ -62,6 +62,140 @@ function RulInfoPopover({ open, onClose }: { open: boolean; onClose: () => void 
   );
 }
 
+type Status = 'ok' | 'warn' | 'crit';
+function StatusBadge({ status, label }: { status: Status; label: string }) {
+  const styles: Record<Status, { bg: string; color: string; border: string; dot: string }> = {
+    ok:   { bg: '#1a3a1a', color: '#3fb950', border: '#3fb950', dot: '🟢' },
+    warn: { bg: '#3a2e00', color: '#d29922', border: '#d29922', dot: '🟡' },
+    crit: { bg: '#3a1a1a', color: '#f85149', border: '#f85149', dot: '🔴' },
+  };
+  const s = styles[status];
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap ml-1"
+      style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}
+    >
+      <span>{s.dot}</span>{label}
+    </span>
+  );
+}
+
+function ObdTitleHover() {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex items-center" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <span>Données OBD</span>
+      <Info className="w-3.5 h-3.5 text-primary ml-1" />
+      {open && (
+        <div
+          className="absolute top-full left-0 mt-2 z-30 rounded-lg p-3 shadow-2xl text-[11px] leading-relaxed"
+          style={{ background: '#1c2333', border: '1px solid #388bfd', color: '#e6edf3', maxWidth: 300, width: 300 }}
+        >
+          <p className="font-bold text-sm mb-1">OBD — On-Board Diagnostics</p>
+          <p>
+            Système de diagnostic embarqué qui lit en temps réel les capteurs du véhicule et remonte
+            les données moteur, freinage, température, pression et codes d'erreur actifs.
+          </p>
+        </div>
+      )}
+    </span>
+  );
+}
+
+function ObdSection({ v, obdStale }: { v: Vehicle; obdStale: boolean }) {
+  const tempStatus: Status = v.obd.engineTemp > 100 ? 'crit' : v.obd.engineTemp >= 80 ? 'warn' : 'ok';
+  const tempLabel = tempStatus === 'crit' ? 'Critique — Surchauffe' : tempStatus === 'warn' ? 'Élevée' : 'Normal';
+
+  const rpmStatus: Status = v.obd.rpm > 3000 ? 'crit' : v.obd.rpm >= 2000 ? 'warn' : 'ok';
+  const rpmLabel = rpmStatus === 'crit' ? 'Critique — Usure' : rpmStatus === 'warn' ? 'Élevé' : 'Normal';
+
+  const loadStatus: Status = v.obd.engineLoad > 80 ? 'crit' : v.obd.engineLoad >= 60 ? 'warn' : 'ok';
+  const loadLabel = loadStatus === 'crit' ? 'Critique — Surcharge' : loadStatus === 'warn' ? 'Élevée' : 'Normal';
+
+  const hoursAgo = (Date.now() - new Date(v.obd.lastCheck).getTime()) / 3600000;
+  const checkStatus: Status = hoursAgo > 24 ? 'crit' : hoursAgo >= 12 ? 'warn' : 'ok';
+  const checkLabel = checkStatus === 'crit' ? 'Données obsolètes' : checkStatus === 'warn' ? 'À actualiser' : 'Récent';
+
+  const fc = v.obd.faultCodes.length;
+  const codesStatus: Status = fc >= 3 ? 'crit' : fc >= 1 ? 'warn' : 'ok';
+  const codesLabel = codesStatus === 'crit' ? 'Anomalies critiques' : codesStatus === 'warn' ? 'Anomalies mineures' : 'Aucune anomalie';
+
+  // Mock additional metrics derived from vehicle data
+  const oilPressure = (3.5 - (v.riskScore / 100) * 2.5).toFixed(1);
+  const oilPressureNum = parseFloat(oilPressure);
+  const oilStatus: Status = oilPressureNum < 1.5 ? 'crit' : oilPressureNum <= 2.5 ? 'warn' : 'ok';
+  const oilLabel = oilStatus === 'crit' ? 'Critique — Risque moteur' : oilStatus === 'warn' ? 'Faible' : 'Normal';
+
+  const battery = (14 - (v.riskScore / 100) * 2.5).toFixed(1);
+  const batteryNum = parseFloat(battery);
+  const batStatus: Status = batteryNum < 12 ? 'crit' : batteryNum <= 13 ? 'warn' : 'ok';
+  const batLabel = batStatus === 'crit' ? 'Défaillance alternateur' : batStatus === 'warn' ? 'Faible' : 'Normal';
+
+  const tirePressure = (2.6 - (v.riskScore / 100) * 1).toFixed(1);
+  const tireNum = parseFloat(tirePressure);
+  const tireStatus: Status = tireNum < 1.8 ? 'crit' : tireNum < 2.2 ? 'warn' : 'ok';
+  const tireLabel = tireStatus === 'crit' ? 'Risque éclatement' : tireStatus === 'warn' ? 'Faible' : 'Normal';
+
+  return (
+    <section className="bg-secondary/50 rounded-xl p-4 space-y-2">
+      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+        <AlertCircle className="w-4 h-4" />
+        <ObdTitleHover />
+        {obdStale && <span className="text-[10px] bg-critical/20 text-critical px-2 py-0.5 rounded-full ml-auto">⚠ &gt;24h</span>}
+      </h3>
+      <div className="space-y-1.5 text-xs">
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Temp. moteur:</span>
+          <span className="text-foreground ml-1 font-medium">{v.obd.engineTemp}°C</span>
+          <StatusBadge status={tempStatus} label={tempLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">RPM:</span>
+          <span className="text-foreground ml-1 font-medium">{v.obd.rpm}</span>
+          <StatusBadge status={rpmStatus} label={rpmLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Charge moteur:</span>
+          <span className="text-foreground ml-1 font-medium">{v.obd.engineLoad}%</span>
+          <StatusBadge status={loadStatus} label={loadLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Pression huile:</span>
+          <span className="text-foreground ml-1 font-medium">{oilPressure} bar</span>
+          <StatusBadge status={oilStatus} label={oilLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Tension batterie:</span>
+          <span className="text-foreground ml-1 font-medium">{battery} V</span>
+          <StatusBadge status={batStatus} label={batLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Pression pneus (moy):</span>
+          <span className="text-foreground ml-1 font-medium">{tirePressure} bar</span>
+          <StatusBadge status={tireStatus} label={tireLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Codes erreur:</span>
+          <span className="text-foreground ml-1 font-medium">{fc}</span>
+          <StatusBadge status={codesStatus} label={codesLabel} />
+        </div>
+        <div className="flex items-center flex-wrap">
+          <span className="text-muted-foreground">Dernière vérif:</span>
+          <span className="text-foreground ml-1 font-medium">{new Date(v.obd.lastCheck).toLocaleString('fr-FR')}</span>
+          <StatusBadge status={checkStatus} label={checkLabel} />
+        </div>
+      </div>
+      {v.obd.faultCodes.length > 0 && (
+        <div className="flex gap-1.5 mt-2 flex-wrap">
+          {v.obd.faultCodes.map(code => (
+            <span key={code} className="text-[10px] bg-critical/20 text-critical px-2 py-0.5 rounded font-mono">{code}</span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function RULBar({ name, percent }: { name: string; percent: number }) {
   const color = percent >= 75 ? 'bg-success' : percent >= 50 ? 'bg-warning' : percent >= 30 ? 'bg-orange-500' : 'bg-critical';
   return (
@@ -280,25 +414,8 @@ export default function VehicleDrawer() {
           </section>
 
           {/* OBD */}
-          <section className="bg-secondary/50 rounded-xl p-4 space-y-2">
-            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" /> Données OBD
-              {obdStale && <span className="text-[10px] bg-critical/20 text-critical px-2 py-0.5 rounded-full ml-auto">⚠ &gt;24h</span>}
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div><span className="text-muted-foreground">Temp. moteur:</span> <span className="text-foreground ml-1">{v.obd.engineTemp}°C</span></div>
-              <div><span className="text-muted-foreground">RPM:</span> <span className="text-foreground ml-1">{v.obd.rpm}</span></div>
-              <div><span className="text-muted-foreground">Charge:</span> <span className="text-foreground ml-1">{v.obd.engineLoad}%</span></div>
-              <div><span className="text-muted-foreground">Check:</span> <span className="text-foreground ml-1">{new Date(v.obd.lastCheck).toLocaleString('fr-FR')}</span></div>
-            </div>
-            {v.obd.faultCodes.length > 0 && (
-              <div className="flex gap-1.5 mt-1 flex-wrap">
-                {v.obd.faultCodes.map(code => (
-                  <span key={code} className="text-[10px] bg-critical/20 text-critical px-2 py-0.5 rounded font-mono">{code}</span>
-                ))}
-              </div>
-            )}
-          </section>
+          <ObdSection v={v} obdStale={obdStale} />
+
 
           {/* Maintenance history */}
           <section className="space-y-2">
