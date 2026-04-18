@@ -4,6 +4,7 @@ import { fleetKPIs } from '@/data/mockData';
 import KPICard from '@/components/KPICard';
 import VehicleCard from '@/components/VehicleCard';
 import VehicleDrawer from '@/components/VehicleDrawer';
+import RulHoverCard from '@/components/RulHoverCard';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
 
@@ -81,19 +82,13 @@ export default function FleetManagerDashboard() {
           </h3>
           <div className="space-y-3">
             {criticalComponents.map((c, i) => (
-              <div key={`${c.vehicleId}-${c.component}-${i}`} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-foreground font-medium">{c.vehicleId}</span>
-                  <span className="text-muted-foreground">{c.component}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-critical rounded-full" style={{ width: `${c.rul}%` }} />
-                  </div>
-                  <span className="text-[10px] text-critical font-bold w-8 text-right">{c.rul}%</span>
-                </div>
-                <p className="text-[10px] text-muted-foreground">{c.days} jours restants</p>
-              </div>
+              <RulHoverCard
+                key={`${c.vehicleId}-${c.component}-${i}`}
+                vehicleId={c.vehicleId}
+                component={c.component}
+                rulPercent={c.rul}
+                daysRemaining={c.days}
+              />
             ))}
           </div>
         </div>
