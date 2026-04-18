@@ -1,8 +1,66 @@
-import { X, Truck, AlertTriangle, Clock, Wrench, DollarSign, Brain, Check, ArrowRight, AlertCircle } from 'lucide-react';
+import { X, Truck, AlertTriangle, Clock, Wrench, DollarSign, Brain, Check, ArrowRight, AlertCircle, Info, ChevronDown } from 'lucide-react';
 import { Vehicle } from '@/data/mockData';
 import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+
+const SUBSYSTEM_WEIGHTS: { name: string; source: string; weight: number; componentKey?: string }[] = [
+  { name: 'Moteur', source: 'Codes erreur + temp + pression huile', weight: 30, componentKey: 'Turbo' },
+  { name: 'Freinage', source: 'Épaisseur plaquettes + pression', weight: 25, componentKey: 'Freins' },
+  { name: 'Transmission', source: 'Temp boîte + glissement', weight: 20, componentKey: 'Injecteurs' },
+  { name: 'Électrique', source: 'Tension batterie + alternateur', weight: 10, componentKey: 'Filtres' },
+  { name: 'Pneumatiques', source: 'Pression + température', weight: 10, componentKey: 'Pneus' },
+  { name: 'Carrosserie/Châssis', source: 'Vibrations anormales', weight: 5, componentKey: 'Pompe à eau' },
+];
+
+function RulInfoPopover({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div
+      ref={ref}
+      className="absolute z-30 left-0 top-6 w-[420px] rounded-xl p-4 shadow-2xl text-xs leading-relaxed"
+      style={{ background: '#1c2333', border: '1px solid #388bfd' }}
+    >
+      <h4 className="text-sm font-bold text-foreground mb-2">RUL — Remaining Useful Life</h4>
+      <p className="text-foreground/80 mb-3">
+        Le RUL est la durée de vie restante estimée d'un composant avant d'atteindre son seuil de défaillance.
+      </p>
+      <p className="font-semibold text-foreground mb-1">3 niveaux de calcul :</p>
+      <div className="space-y-2 text-foreground/80">
+        <div>
+          <p className="font-semibold text-primary">① Dégradation linéaire (utilisé dans ce prototype)</p>
+          <code className="block bg-background/50 p-2 rounded font-mono text-[11px] mt-1">
+            RUL = (Seuil_critique - Valeur_actuelle) / Taux_de_dégradation
+          </code>
+        </div>
+        <div>
+          <p className="font-semibold text-primary">② Modèle de Weibull (standard industriel)</p>
+          <code className="block bg-background/50 p-2 rounded font-mono text-[11px] mt-1">
+            F(t) = 1 - exp[-(t/η)^β]
+          </code>
+          <p className="text-[11px] mt-1">Modélise la probabilité de défaillance dans le temps.</p>
+        </div>
+        <div>
+          <p className="font-semibold text-primary">③ Machine Learning — LSTM / Random Forest (évolution future)</p>
+          <p className="text-[11px] mt-1">
+            Entraîné sur séries temporelles OBD : température, pression, régime, vibrations, codes d'erreur historiques.
+            C'est l'approche utilisée par Samsara et Geotab.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function RULBar({ name, percent }: { name: string; percent: number }) {
   const color = percent >= 75 ? 'bg-success' : percent >= 50 ? 'bg-warning' : percent >= 30 ? 'bg-orange-500' : 'bg-critical';
