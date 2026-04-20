@@ -20,12 +20,22 @@ const CREDENTIALS: Record<Role, { email: string; password: string }> = {
 
 const STORAGE_KEY = 'nexttransit_auth';
 
+const VALID_ROLES: Role[] = ['fleet-manager', 'dg', 'controlling'];
+
 function loadAuth(): AuthState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.isAuthenticated && parsed.role) return parsed;
+      if (
+        parsed &&
+        parsed.isAuthenticated === true &&
+        typeof parsed.role === 'string' &&
+        VALID_ROLES.includes(parsed.role) &&
+        typeof parsed.email === 'string'
+      ) {
+        return { isAuthenticated: true, role: parsed.role, email: parsed.email };
+      }
     }
   } catch {}
   return { isAuthenticated: false, role: null, email: null };
