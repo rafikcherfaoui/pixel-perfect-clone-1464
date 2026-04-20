@@ -20,12 +20,22 @@ const CREDENTIALS: Record<Role, { email: string; password: string }> = {
 
 const STORAGE_KEY = 'nexttransit_auth';
 
+const VALID_ROLES: Role[] = ['fleet-manager', 'dg', 'controlling'];
+
 function loadAuth(): AuthState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed.isAuthenticated && parsed.role) return parsed;
+      if (
+        parsed &&
+        parsed.isAuthenticated === true &&
+        typeof parsed.role === 'string' &&
+        VALID_ROLES.includes(parsed.role) &&
+        typeof parsed.email === 'string'
+      ) {
+        return { isAuthenticated: true, role: parsed.role, email: parsed.email };
+      }
     }
   } catch {}
   return { isAuthenticated: false, role: null, email: null };
@@ -37,7 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(loadAuth);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (state.isAuthenticated) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }, [state]);
 
   const login = useCallback((email: string, password: string, role: Role): boolean => {
