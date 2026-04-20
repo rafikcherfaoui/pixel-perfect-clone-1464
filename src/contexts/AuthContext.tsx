@@ -47,7 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(loadAuth);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (state.isAuthenticated) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }, [state]);
 
   const login = useCallback((email: string, password: string, role: Role): boolean => {
